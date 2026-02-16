@@ -1,5 +1,9 @@
 /**
  * SecureFx 加密工具 - CSS样式
+ * 
+ * Copyright (c) 2024-2025 SecureFx Contributors
+ * SPDX-License-Identifier: MIT
+ * 
  * 简约设计风格
  */
 
@@ -758,6 +762,20 @@ body {
     color: var(--text-primary);
     word-break: break-all;
     margin-right: var(--spacing-sm);
+}
+
+.copy-pwd-btn {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--gradient-primary);
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all var(--transition-fast);
+}
+
+.copy-pwd-btn:hover {
+    transform: scale(1.1);
 }
 
 .section {

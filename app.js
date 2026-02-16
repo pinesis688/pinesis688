@@ -1,6 +1,9 @@
 /**
  * SecureFx 加密工具箱
  * 
+ * Copyright (c) 2024-2025 SecureFx Contributors
+ * SPDX-License-Identifier: MIT
+ * 
  * 功能概述：
  * - 对称加密（AES-GCM + Argon2id/Scrypt）
  * - 混合加密（RSA/ECC + AES会话密钥）
@@ -14,6 +17,7 @@
  * 
  * @author SecureFx Team
  * @version 3.0.0
+ * @license MIT
  */
 
 (function () {
@@ -212,7 +216,7 @@
     }
 
     /* ============================================
-       威胁模型显性化警告 - 由HTML内联脚本处理
+       威胁模型显性化警告
        ============================================ */
 
     function showSecurityWarning() {
@@ -222,13 +226,13 @@
                 resolve(true);
                 return;
             }
+
             if (localStorage.getItem('securefx_risk_acknowledged')) {
                 overlay.classList.remove('active');
                 resolve(true);
                 return;
             }
-            // HTML内联脚本已处理事件绑定
-            // 等待用户操作
+
             const checkInterval = setInterval(() => {
                 if (!overlay.classList.contains('active')) {
                     clearInterval(checkInterval);
@@ -236,7 +240,6 @@
                 }
             }, 100);
 
-            // 超时保护
             setTimeout(() => {
                 clearInterval(checkInterval);
                 resolve(true);
@@ -4801,15 +4804,26 @@
 
             discreteFourierTransform(bits) {
                 const n = bits.length;
+                if (n < 32) return { passed: false, pValue: 0, error: '数据太短，至少需要32位' };
+
                 const X = [];
                 for (let i = 0; i < n; i++) {
                     X.push(bits[i] === 1 ? 1 : -1);
                 }
 
+                const nextPow2 = Math.pow(2, Math.ceil(Math.log2(n)));
+                while (X.length < nextPow2) X.push(0);
+
                 const S = this.fastFourierTransform(X);
                 const modulus = [];
                 for (let i = 0; i < Math.floor(n / 2); i++) {
-                    modulus.push(Math.sqrt(S[i].re * S[i].re + S[i].im * S[i].im));
+                    if (S[i] && typeof S[i].re === 'number') {
+                        modulus.push(Math.sqrt(S[i].re * S[i].re + S[i].im * S[i].im));
+                    }
+                }
+
+                if (modulus.length === 0) {
+                    return { passed: false, pValue: 0, error: 'FFT计算失败' };
                 }
 
                 const T = Math.sqrt(Math.log(1 / 0.05) * n);
@@ -4934,13 +4948,14 @@
 
             fastFourierTransform(x) {
                 const n = x.length;
-                if (n <= 1) return x.map(re => ({ re, im: 0 }));
+                if (n === 0) return [];
+                if (n === 1) return [{ re: typeof x[0] === 'object' ? x[0].re : (x[0] || 0), im: typeof x[0] === 'object' ? x[0].im : 0 }];
 
                 const even = [];
                 const odd = [];
                 for (let i = 0; i < n; i += 2) {
                     even.push(x[i]);
-                    odd.push(x[i + 1]);
+                    if (i + 1 < n) odd.push(x[i + 1]);
                 }
 
                 const q = this.fastFourierTransform(even);
@@ -4948,13 +4963,15 @@
 
                 const X = new Array(n);
                 for (let k = 0; k < n / 2; k++) {
+                    const rk = r[k % r.length] || { re: 0, im: 0 };
+                    const qk = q[k % q.length] || { re: 0, im: 0 };
                     const t = -2 * Math.PI * k / n;
                     const cos = Math.cos(t);
                     const sin = Math.sin(t);
-                    const re = r[k].re * cos - r[k].im * sin;
-                    const im = r[k].re * sin + r[k].im * cos;
-                    X[k] = { re: q[k].re + re, im: q[k].im + im };
-                    X[k + n / 2] = { re: q[k].re - re, im: q[k].im - im };
+                    const re = rk.re * cos - rk.im * sin;
+                    const im = rk.re * sin + rk.im * cos;
+                    X[k] = { re: qk.re + re, im: qk.im + im };
+                    X[k + n / 2] = { re: qk.re - re, im: qk.im - im };
                 }
 
                 return X;
@@ -4981,51 +4998,26 @@
                 if (x <= 0) return 1;
                 if (a <= 0) return 0;
 
-                let y = 0;
-                let c = 0;
-                let d = 0;
-                let p = 0;
-                let q = 0;
-                let z = 0;
-                let err = 0;
-
-                const xbig = 1e20;
-                const y0 = 1e-12;
-                const y1 = 1e20;
                 const nbits = 24;
                 const epsilon = Math.pow(2, -nbits);
-                const threshold = 2 * Math.log(xbig);
 
                 if (x < 0 || a <= 0) return 0;
                 if (x === 0) return 1;
 
-                if (x < a + 1) {
-                    y = a * Math.log(x) - x - this.lgamma(a);
-                    c = 1;
-                    p = a;
-                    q = a;
-                    z = 1 / q;
-                    err = z;
-                    while (err > epsilon * z) {
-                        p++;
-                        q = q * x / p;
-                        z = z + q;
-                        err = Math.abs(q / z);
-                    }
-                    return 1 - z * Math.exp(y);
-                }
-
-                y = a * Math.log(x) - x - this.lgamma(a);
-                c = 1;
-                p = a;
-                q = a;
-                z = 1 / q;
-                err = z;
+                let y = a * Math.log(x) - x - this.lgamma(a);
+                let p = a;
+                let q = a;
+                let z = 1 / q;
+                let err = z;
                 while (err > epsilon * z) {
                     p++;
                     q = q * x / p;
                     z = z + q;
                     err = Math.abs(q / z);
+                }
+
+                if (x < a + 1) {
+                    return 1 - z * Math.exp(y);
                 }
                 return z * Math.exp(y);
             },
@@ -5243,215 +5235,6 @@
 
             this.disabled = false;
             this.textContent = '🎲 执行随机性检测';
-        });
-
-        /* ============================================
-           编码转换工具箱
-           ============================================ */
-
-        document.querySelectorAll('[data-encoding-mode]').forEach(btn => {
-            btn.addEventListener('click', function () {
-                document.querySelectorAll('[data-encoding-mode]').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                const mode = this.dataset.encodingMode;
-                document.getElementById('encoding-text-panel').style.display = mode === 'text' ? 'block' : 'none';
-                document.getElementById('encoding-hex-panel').style.display = mode === 'hex' ? 'block' : 'none';
-                document.getElementById('encoding-url-panel').style.display = mode === 'url' ? 'block' : 'none';
-            });
-        });
-
-        document.querySelectorAll('[data-hex-input]').forEach(btn => {
-            btn.addEventListener('click', function () {
-                document.querySelectorAll('[data-hex-input]').forEach(b => b.classList.remove('selected'));
-                this.classList.add('selected');
-            });
-        });
-
-        function textToHex(text) {
-            const encoder = new TextEncoder();
-            const bytes = encoder.encode(text);
-            return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
-        }
-
-        function hexToText(hex) {
-            const cleanHex = hex.replace(/\s/g, '');
-            const bytes = new Uint8Array(cleanHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-            return new TextDecoder().decode(bytes);
-        }
-
-        document.getElementById('textToHexBtn')?.addEventListener('click', function () {
-            const input = document.getElementById('encodingTextInput').value;
-            if (!input) { alert('请输入文本'); return; }
-            document.getElementById('encodingExtrasOutput').value = textToHex(input);
-        });
-
-        document.getElementById('textToBase64Btn')?.addEventListener('click', function () {
-            const input = document.getElementById('encodingTextInput').value;
-            if (!input) { alert('请输入文本'); return; }
-            document.getElementById('encodingExtrasOutput').value = btoa(unescape(encodeURIComponent(input)));
-        });
-
-        document.getElementById('textToUtf8Btn')?.addEventListener('click', function () {
-            const input = document.getElementById('encodingTextInput').value;
-            if (!input) { alert('请输入文本'); return; }
-            const bytes = new TextEncoder().encode(input);
-            document.getElementById('encodingExtrasOutput').value = '[' + Array.from(bytes).join(', ') + ']';
-        });
-
-        document.getElementById('hexToTextBtn')?.addEventListener('click', function () {
-            const input = document.getElementById('hexInput').value;
-            const inputType = document.querySelector('[data-hex-input].selected')?.dataset.hexInput;
-            if (!input) { alert('请输入数据'); return; }
-            try {
-                let hex = input;
-                if (inputType === 'binary') {
-                    const clean = input.replace(/\s/g, '');
-                    hex = clean.match(/.{1,8}/g).map(b => parseInt(b, 2).toString(16).padStart(2, '0')).join('');
-                } else if (inputType === 'decimal') {
-                    const num = BigInt(input);
-                    hex = num.toString(16);
-                }
-                document.getElementById('encodingExtrasOutput').value = hexToText(hex);
-            } catch (e) {
-                alert('转换失败: ' + e.message);
-            }
-        });
-
-        document.getElementById('hexToBinaryBtn')?.addEventListener('click', function () {
-            const input = document.getElementById('hexInput').value;
-            const inputType = document.querySelector('[data-hex-input].selected')?.dataset.hexInput;
-            if (!input) { alert('请输入数据'); return; }
-            try {
-                let binary = '';
-                if (inputType === 'hex') {
-                    const clean = input.replace(/\s/g, '');
-                    binary = clean.split('').map(c => parseInt(c, 16).toString(2).padStart(4, '0')).join('');
-                } else if (inputType === 'decimal') {
-                    binary = BigInt(input).toString(2);
-                } else {
-                    binary = input.replace(/\s/g, '');
-                }
-                document.getElementById('encodingExtrasOutput').value = binary.match(/.{1,8}/g).join(' ');
-            } catch (e) {
-                alert('转换失败: ' + e.message);
-            }
-        });
-
-        document.getElementById('hexToDecimalBtn')?.addEventListener('click', function () {
-            const input = document.getElementById('hexInput').value;
-            const inputType = document.querySelector('[data-hex-input].selected')?.dataset.hexInput;
-            if (!input) { alert('请输入数据'); return; }
-            try {
-                let decimal = '';
-                if (inputType === 'hex') {
-                    decimal = '0x' + input.replace(/\s/g, '');
-                } else if (inputType === 'binary') {
-                    decimal = '0b' + input.replace(/\s/g, '');
-                } else {
-                    decimal = input;
-                }
-                document.getElementById('encodingExtrasOutput').value = BigInt(decimal).toString(10);
-            } catch (e) {
-                alert('转换失败: ' + e.message);
-            }
-        });
-
-        document.getElementById('urlEncodeBtn')?.addEventListener('click', function () {
-            const input = document.getElementById('urlInput').value;
-            if (!input) { alert('请输入URL或文本'); return; }
-            document.getElementById('encodingExtrasOutput').value = encodeURIComponent(input);
-        });
-
-        document.getElementById('urlDecodeBtn')?.addEventListener('click', function () {
-            const input = document.getElementById('urlInput').value;
-            if (!input) { alert('请输入URL或文本'); return; }
-            try {
-                document.getElementById('encodingExtrasOutput').value = decodeURIComponent(input);
-            } catch (e) {
-                alert('解码失败: ' + e.message);
-            }
-        });
-
-        document.getElementById('copyEncodingExtrasBtn')?.addEventListener('click', async function () {
-            const output = document.getElementById('encodingExtrasOutput').value;
-            if (output) {
-                try { await navigator.clipboard.writeText(output); alert('已复制'); }
-                catch (e) { alert('复制失败'); }
-            }
-        });
-
-        document.getElementById('clearEncodingExtrasBtn')?.addEventListener('click', function () {
-            document.getElementById('encodingTextInput').value = '';
-            document.getElementById('hexInput').value = '';
-            document.getElementById('urlInput').value = '';
-            document.getElementById('encodingExtrasOutput').value = '';
-        });
-
-        /* ============================================
-           证书解析功能
-           ============================================ */
-
-        document.getElementById('certFileInput')?.addEventListener('change', function () {
-            const file = this.files[0];
-            const fileInfo = document.getElementById('certFileInfo');
-            if (file) {
-                fileInfo.classList.add('active');
-                fileInfo.innerHTML = `<div class="file-info-row"><span class="file-info-label">文件名:</span><span class="file-info-value">${file.name}</span></div><div class="file-info-row"><span class="file-info-label">大小:</span><span class="file-info-value">${formatSize(file.size)}</span></div>`;
-                updateFileUploadArea('certFileArea', file.name);
-            } else {
-                fileInfo.classList.remove('active');
-            }
-        });
-
-        setupDragDrop('certFileArea', 'certFileInput');
-
-        document.getElementById('parseCertBtn')?.addEventListener('click', async function () {
-            const file = document.getElementById('certFileInput').files[0];
-            const pemInput = document.getElementById('certPemInput').value;
-            const resultsDiv = document.getElementById('certResults');
-
-            let certData = null;
-
-            if (file) {
-                try {
-                    const buffer = await file.arrayBuffer();
-                    certData = new Uint8Array(buffer);
-                } catch (e) {
-                    alert('读取文件失败: ' + e.message);
-                    return;
-                }
-            } else if (pemInput) {
-                try {
-                    const pem = pemInput.trim();
-                    const base64 = pem.replace(/-----BEGIN CERTIFICATE-----/g, '')
-                        .replace(/-----END CERTIFICATE-----/g, '')
-                        .replace(/\s/g, '');
-                    certData = base64ToArray(base64);
-                } catch (e) {
-                    alert('解析PEM失败: ' + e.message);
-                    return;
-                }
-            } else {
-                alert('请选择证书文件或粘贴PEM内容');
-                return;
-            }
-
-            resultsDiv.style.display = 'block';
-            resultsDiv.innerHTML = `
-                <div class="result-box success">
-                    <h4 style="margin-bottom:10px;">📜 证书基本信息</h4>
-                    <p><strong>证书大小:</strong> ${certData.length} 字节</p>
-                    <p><strong>格式:</strong> ${file ? file.name.match(/\.der$/i) ? 'DER' : 'PEM' : 'PEM'}</p>
-                    <p style="margin-top:15px;color:var(--text-tertiary);">
-                        ⚠️ 完整的 X.509 证书解析需要专用库支持。
-                        <br>建议使用专业工具如 OpenSSL 进行详细解析。
-                    </p>
-                </div>
-                <div class="form-group" style="margin-top:20px;">
-                    <label class="form-label">原始证书数据 (HEX)</label>
-                    <textarea class="form-control textarea" rows="4" readonly>${Array.from(certData).map(b => b.toString(16).padStart(2, '0')).join(' ')}</textarea>
-                </div>
-            `;
         });
 
         checkCryptoSupport();

@@ -1,3 +1,8 @@
+<!--
+  SecureFx 加密工具箱
+  Copyright (c) 2024-2025 SecureFx Contributors
+  SPDX-License-Identifier: MIT
+-->
 <!DOCTYPE html>
 <html lang="zh-CN">
 
@@ -6,7 +11,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="SecureFx 加密工具 - 文件加密、RSA、哈希、Base64、密码生成">
     <meta name="theme-color" content="#3b82f6">
-    <title>SecureFx 加密工具箱</title>
+    <title>SecureFx</title>
 
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%233b82f6'/%3E%3Crect x='25' y='45' width='50' height='40' rx='5' fill='%23fff'/%3E%3Cpath d='M35 45V35a15 15 0 1 1 30 0v10' stroke='%23fff' stroke-width='8' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='50' cy='65' r='6' fill='%233b82f6'/%3E%3Crect x='47' y='65' width='6' height='12' rx='2' fill='%233b82f6'/%3E%3C/svg%3E">
@@ -44,8 +49,67 @@
 
 <body>
     <script>
-        // 清除旧的确认记录，确保对话框显示
+        // 清除旧的确认记录，确保对话框显示（调试用）
         // localStorage.removeItem('securefx_risk_acknowledged');
+
+        // 强制重新显示安全警告框（按住 Ctrl+Shift+S）
+        document.addEventListener('keydown', function (e) {
+            if (e.ctrlKey && e.shiftKey && e.key === 'S') {
+                localStorage.removeItem('securefx_risk_acknowledged');
+                location.reload();
+            }
+        });
+
+        // 安全警告框处理函数
+        document.addEventListener('DOMContentLoaded', function () {
+            var overlay = document.getElementById('securityModalOverlay');
+            var acceptBtn = document.getElementById('securityAcceptBtn');
+            var declineBtn = document.getElementById('securityDeclineBtn');
+            var checkDevice = document.getElementById('checkDevice');
+            var checkUnderstand = document.getElementById('checkUnderstand');
+
+            // 检查是否需要显示警告框
+            if (localStorage.getItem('securefx_risk_acknowledged')) {
+                if (overlay) overlay.classList.remove('active');
+                return;
+            }
+
+            // 更新按钮状态
+            function updateButtonState() {
+                var allChecked = (checkDevice && checkDevice.checked) && (checkUnderstand && checkUnderstand.checked);
+                if (acceptBtn) {
+                    if (allChecked) {
+                        acceptBtn.removeAttribute('disabled');
+                    } else {
+                        acceptBtn.setAttribute('disabled', 'disabled');
+                    }
+                }
+            }
+
+            // 绑定复选框事件
+            if (checkDevice) checkDevice.addEventListener('change', updateButtonState);
+            if (checkUnderstand) checkUnderstand.addEventListener('change', updateButtonState);
+
+            // 接受按钮点击
+            if (acceptBtn) {
+                acceptBtn.onclick = function () {
+                    if (!this.hasAttribute('disabled')) {
+                        localStorage.setItem('securefx_risk_acknowledged', 'true');
+                        if (overlay) overlay.classList.remove('active');
+                    }
+                };
+            }
+
+            // 拒绝按钮点击
+            if (declineBtn) {
+                declineBtn.onclick = function () {
+                    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;font-family:system-ui;background:#1f2937;"><h2 style="color:#f3f4f6;">操作终止</h2><p style="color:#9ca3af;margin-top:8px;">请在理解风险后使用本工具</p></div>';
+                };
+            }
+
+            // 初始化按钮状态
+            updateButtonState();
+        });
     </script>
     <div class="env-warning" id="envWarning">⚠️ 检测到非安全环境！请在 Chrome/Firefox 等标准浏览器中打开</div>
 
@@ -79,54 +143,13 @@
                 </div>
             </div>
             <div class="security-modal-footer">
-                <button id="securityDeclineBtn" class="btn btn-outline" style="width:auto;">拒绝</button>
-                <button id="securityAcceptBtn" class="btn" style="width:auto;" disabled>接受并继续</button>
+                <button type="button" id="securityDeclineBtn" class="btn btn-outline" style="width:auto;"
+                    onclick="handleDecline()">拒绝</button>
+                <button type="button" id="securityAcceptBtn" class="btn" style="width:auto;" disabled
+                    onclick="handleAccept()">接受并继续</button>
             </div>
         </div>
     </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            var overlay = document.getElementById('securityModalOverlay');
-            var acceptBtn = document.getElementById('securityAcceptBtn');
-            var declineBtn = document.getElementById('securityDeclineBtn');
-            var checkboxes = [
-                document.getElementById('checkDevice'),
-                document.getElementById('checkUnderstand')
-            ];
-
-            function updateButton() {
-                var allChecked = checkboxes.every(function (cb) { return cb && cb.checked; });
-                if (allChecked) {
-                    acceptBtn.removeAttribute('disabled');
-                } else {
-                    acceptBtn.setAttribute('disabled', 'disabled');
-                }
-            }
-
-            checkboxes.forEach(function (cb) {
-                if (cb) cb.addEventListener('change', updateButton);
-            });
-
-            acceptBtn.addEventListener('click', function (e) {
-                e.preventDefault();
-                if (acceptBtn.hasAttribute('disabled')) return;
-                localStorage.setItem('securefx_risk_acknowledged', 'true');
-                overlay.classList.remove('active');
-            });
-
-            declineBtn.addEventListener('click', function (e) {
-                e.preventDefault();
-                document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;font-family:system-ui;background:#1f2937;"><h2 style="color:#f3f4f6;">操作终止</h2><p style="color:#9ca3af;margin-top:8px;">请在理解风险后使用本工具</p></div>';
-            });
-
-            if (localStorage.getItem('securefx_risk_acknowledged')) {
-                overlay.classList.remove('active');
-            }
-
-            updateButton();
-        });
-    </script>
 
     <div class="container">
         <div class="sidebar" id="pc-sidebar">
@@ -161,12 +184,6 @@
             </div>
             <div class="nav-item-pc" data-target="randomness-section">
                 <span>🎲</span><span>随机性检测</span>
-            </div>
-            <div class="nav-item-pc" data-target="encoding-extras-section">
-                <span>🔄</span><span>编码转换</span>
-            </div>
-            <div class="nav-item-pc" data-target="cert-section">
-                <span>📜</span><span>证书解析</span>
             </div>
             <div class="nav-item-pc" data-target="selftest-section">
                 <span>✅</span><span data-i18n="nav.selftest">自检/说明</span>
@@ -1010,107 +1027,6 @@
                 </div>
             </div>
 
-            <!-- 编码转换 -->
-            <div id="encoding-extras-section" class="section">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-icon">🔄</div>
-                        <h2 class="card-title">编码转换工具箱</h2>
-                    </div>
-                    <div class="mode-toggle">
-                        <button class="mode-toggle-btn active" data-encoding-mode="text">📝 文本编码</button>
-                        <button class="mode-toggle-btn" data-encoding-mode="hex">🔢 进制转换</button>
-                        <button class="mode-toggle-btn" data-encoding-mode="url">🔗 URL编码</button>
-                    </div>
-                    <div id="encoding-text-panel">
-                        <div class="form-group">
-                            <label class="form-label">📝 输入文本</label>
-                            <textarea id="encodingTextInput" class="form-control textarea" rows="4"
-                                placeholder="输入要转换的文本..."></textarea>
-                        </div>
-                        <div class="download-buttons">
-                            <button class="btn" id="textToHexBtn">→ 十六进制</button>
-                            <button class="btn" id="textToBase64Btn">→ Base64</button>
-                            <button class="btn" id="textToUtf8Btn">→ UTF-8字节</button>
-                        </div>
-                    </div>
-                    <div id="encoding-hex-panel" style="display:none;">
-                        <div class="form-group">
-                            <label class="form-label">🔢 输入数据</label>
-                            <textarea id="hexInput" class="form-control textarea" rows="4"
-                                placeholder="输入十六进制、二进制或十进制数据..."></textarea>
-                        </div>
-                        <div class="algo-selector">
-                            <div class="algo-option selected" data-hex-input="hex">
-                                <h4>十六进制</h4>
-                                <p>0-9, A-F</p>
-                            </div>
-                            <div class="algo-option" data-hex-input="binary">
-                                <h4>二进制</h4>
-                                <p>0, 1</p>
-                            </div>
-                            <div class="algo-option" data-hex-input="decimal">
-                                <h4>十进制</h4>
-                                <p>0-9</p>
-                            </div>
-                        </div>
-                        <div class="download-buttons">
-                            <button class="btn" id="hexToTextBtn">→ 文本</button>
-                            <button class="btn" id="hexToBinaryBtn">→ 二进制</button>
-                            <button class="btn" id="hexToDecimalBtn">→ 十进制</button>
-                        </div>
-                    </div>
-                    <div id="encoding-url-panel" style="display:none;">
-                        <div class="form-group">
-                            <label class="form-label">🔗 输入URL或文本</label>
-                            <input type="text" id="urlInput" class="form-control" placeholder="输入URL或文本...">
-                        </div>
-                        <div class="download-buttons">
-                            <button class="btn" id="urlEncodeBtn">🔒 URL编码</button>
-                            <button class="btn" id="urlDecodeBtn">🔓 URL解码</button>
-                        </div>
-                    </div>
-                    <div class="form-group" style="margin-top:20px;">
-                        <label class="form-label">📤 输出结果</label>
-                        <textarea id="encodingExtrasOutput" class="form-control textarea" rows="4" readonly
-                            placeholder="结果将显示在这里..."></textarea>
-                    </div>
-                    <div class="download-buttons">
-                        <div class="download-btn" id="copyEncodingExtrasBtn"><span>📋</span><span>复制结果</span></div>
-                        <div class="download-btn" id="clearEncodingExtrasBtn"><span>🗑️</span><span>清空</span></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 证书解析 -->
-            <div id="cert-section" class="section">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-icon">📜</div>
-                        <h2 class="card-title">数字证书解析</h2>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">📁 选择证书文件 (PEM/DER)</label>
-                        <div class="file-upload-wrapper">
-                            <div class="file-upload-area" id="certFileArea">
-                                <span class="file-upload-icon">📤</span>
-                                <div class="file-upload-text">点击或拖拽证书文件到此处</div>
-                            </div>
-                            <input type="file" id="certFileInput" class="file-upload-input"
-                                accept=".pem,.cer,.crt,.der">
-                        </div>
-                        <div class="file-info" id="certFileInfo"></div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">📝 或粘贴PEM格式证书</label>
-                        <textarea id="certPemInput" class="form-control textarea" rows="6"
-                            placeholder="粘贴PEM格式证书内容（包含 -----BEGIN CERTIFICATE-----）"></textarea>
-                    </div>
-                    <button class="btn" id="parseCertBtn">📜 解析证书</button>
-                    <div id="certResults" style="display:none; margin-top:20px;"></div>
-                </div>
-            </div>
-
             <!-- 自检功能 -->
             <div id="selftest-section" class="section">
                 <div class="card">
@@ -1270,8 +1186,6 @@
             <div class="nav-item" data-target="keygen-section"><span>🗝️</span><span>密钥</span></div>
             <div class="nav-item" data-target="password-strength-section"><span>📊</span><span>强度</span></div>
             <div class="nav-item" data-target="randomness-section"><span>🎲</span><span>随机性</span></div>
-            <div class="nav-item" data-target="encoding-extras-section"><span>🔄</span><span>编码</span></div>
-            <div class="nav-item" data-target="cert-section"><span>📜</span><span>证书</span></div>
             <div class="nav-item" data-target="selftest-section"><span>✅</span><span>自检</span></div>
         </nav>
 

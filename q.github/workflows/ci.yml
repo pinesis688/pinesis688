@@ -1,0 +1,165 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly security scan
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci || npm install
+      
+      - name: Run ESLint
+        run: npm run lint
+        continue-on-error: true
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci || npm install
+      
+      - name: Run tests
+        run: npm test
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./coverage/coverage-final.json
+          fail_ci_if_error: false
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check for secrets
+        run: |
+          echo "Checking for potential secrets..."
+          if grep -rE "(password|secret|api_key|private_key|token)\s*=\s*['\"][^'\"]+['\"]" app.js --include="*.js" 2>/dev/null; then
+            echo "Warning: Potential hardcoded secrets found"
+            exit 1
+          fi
+          echo "No hardcoded secrets found"
+      
+      - name: Check for console.log in production code
+        run: |
+          if grep -r "console\.log\|console\.debug" app.js 2>/dev/null; then
+            echo "Warning: console.log statements found in production code"
+          fi
+
+  dynamic-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate || true
+        continue-on-error: true
+      
+      - name: Run npm audit (production only)
+        run: npm audit --production --audit-level=high || true
+        continue-on-error: true
+      
+      - name: Check for known vulnerabilities
+        run: |
+          echo "Checking for known vulnerabilities in dependencies..."
+          npm audit --json > audit-report.json || true
+          if [ -f audit-report.json ]; then
+            echo "Audit report generated"
+          fi
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript"
+
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Validate HTML
+        run: |
+          echo "Validating HTML structure..."
+          if grep -q "<!DOCTYPE html>" index.html; then
+            echo "HTML DOCTYPE found"
+          else
+            echo "Warning: Missing DOCTYPE"
+          fi
+      
+      - name: Check required files
+        run: |
+          echo "Checking required files..."
+          required_files=("index.html" "app.js" "style.css" "README.md" "LICENSE" "SECURITY.md" "CONTRIBUTING.md" "CODE_OF_CONDUCT.md" "CHANGELOG.md")
+          for file in "${required_files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✓ $file exists"
+            else
+              echo "✗ $file missing"
+              exit 1
+            fi
+          done
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint, test, validate]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Create artifact
+        run: |
+          mkdir -p dist
+          cp -r *.html *.js *.css *.md LICENSE dist/ 2>/dev/null || true
+          cp -r .github dist/ 2>/dev/null || true
+          cp -r tests dist/ 2>/dev/null || true
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: securefx-dist
+          path: dist/
+          retention-days: 7

@@ -1,5 +1,9 @@
 /**
  * SecureFx 解密 Web Worker
+ * 
+ * Copyright (c) 2024-2025 SecureFx Contributors
+ * SPDX-License-Identifier: MIT
+ * 
  * 使用 Streams API 处理大文件解密，避免阻塞主线程
  */
 
