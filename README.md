@@ -101,7 +101,7 @@
 
 直接打开 `index.html` 即可使用，无需安装。
 
-或访问在线版本：[https://pinesis688-main.vercel.app](https://pinesis688-main.vercel.app)
+或访问在线版本：[https://secure-fx.vercel.app](https://secure-fx.vercel.app)
 
 ## 💻 浏览器兼容性
 
