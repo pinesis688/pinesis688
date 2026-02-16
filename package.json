@@ -32,6 +32,7 @@
   },
   "homepage": "https://github.com/pinesis688/SecureFx#readme",
   "devDependencies": {
+    "esbuild": "^0.25.0",
     "eslint": "^9.18.0",
     "globals": "^15.14.0",
     "vitest": "^3.0.0",
