@@ -9,8 +9,7 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint app.js encrypt-worker.js decrypt-worker.js",
     "lint:fix": "eslint app.js encrypt-worker.js decrypt-worker.js --fix",
-    "serve": "npx serve .",
-    "build": "echo 'No build step required - this is a static web application'"
+    "serve": "npx serve ."
   },
   "keywords": [
     "encryption",
@@ -26,12 +25,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pinesis/SecureFx.git"
+    "url": "https://github.com/pinesis688/SecureFx.git"
   },
   "bugs": {
-    "url": "https://github.com/pinesis/SecureFx/issues"
+    "url": "https://github.com/pinesis688/SecureFx/issues"
   },
-  "homepage": "https://github.com/pinesis/SecureFx#readme",
+  "homepage": "https://github.com/pinesis688/SecureFx#readme",
   "devDependencies": {
     "eslint": "^8.57.0",
     "vitest": "^1.3.0",
